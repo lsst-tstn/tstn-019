@@ -37,7 +37,7 @@ authors:
 copyright: "2020, Association of Universities for Research in Astronomy, Inc. (AURA)"
 
 # Description. A short, 1-2 sentence statemement used by document indices.
-description: "This document describes the operational system for deploying containerize control system components to Kubernetes resources."
+description: "This document describes the operational system for deploying containerized control system components to Kubernetes resources."
 
 # Abstract, if available
 # abstract: >

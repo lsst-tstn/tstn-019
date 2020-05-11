@@ -1,11 +1,21 @@
 ArgoCD Configuration
 ====================
 
-The configuration and subsequent deployment of the control components is handled by the `ArgoCD <https://argoproj.github.io/argo-cd/>`_ system. The code for the ArgoCD configuration is kept in the `ArgoCD Github repository <https://github.com/lsst-ts/argocd-csc>`_. The deployment methodologies will be handled in forthcoming sections. ArgoCD uses the concept of an app of app (or chart of charts). Each app requires a specfic chart or charts to use in order to deploy. 
+The configuration and subsequent deployment of the control components is
+handled by the `ArgoCD <https://argoproj.github.io/argo-cd/>`_ system. The
+code for the ArgoCD configuration is kept in the
+`ArgoCD Github repository <https://github.com/lsst-ts/argocd-csc>`_. The
+deployment methodologies will be handled in forthcoming sections. ArgoCD uses
+the concept of an app of app (or chart of charts). Each app requires a specfic
+chart or charts to use in order to deploy. 
 
-Each component has its own directory within the top-level `apps` directory. This includes the Kafka producers. There are a few special apps (further called collector apps) which collect the main CSC component apps into a group. Those will be discussed later. 
+Each component has its own directory within the top-level `apps` directory. This
+includes the Kafka producers. There are a few special apps (further called
+collector apps) which collect the main CSC component apps into a group. Those
+will be discussed later. 
 
-The contents found within the application directories have roughly the same content.
+The contents found within the application directories have roughly the same
+content.
 
 Chart.yaml
   This file specifies the name of the application with that key in the file.
@@ -14,10 +24,14 @@ requirements.yaml
   This file specifies the Helm chart to use including the version.
 
 values.yaml
-  This file contains base information that will apply to all site specific configuration. May not be present in all applications.
+  This file contains base information that will apply to all site specific
+  configuration. May not be present in all applications.
 
 values-<site tag>.yaml
-  This file contains site specific information for the configuration. It may override configuration provided in the `values.yaml` file. The supported sites listed in the following table and not all applications will have all sites supported.
+  This file contains site specific information for the configuration. It may
+  override configuration provided in the `values.yaml` file. The supported sites
+  listed in the following table and not all applications will have all sites
+  supported.
 
 .. list-table:: Supported Sites
    :widths: 10 20
@@ -37,23 +51,32 @@ values-<site tag>.yaml
      - Tucson Test Stand. This is now largely defunct
 
 templates
-  This directory contains a `<app-name>-ns.yaml` file defining a Kubernetes Cluster API: Namespace. This defines a specific namespace for the application.
+  This directory contains a `<app-name>-ns.yaml` file defining a Kubernetes
+  Cluster API: Namespace. This defines a specific namespace for the application.
 
-All `values*.yaml` files start with the chart name the application uses as the top-level key. Further keys are specified in the same manner as the Helm chart configuration.
+All `values*.yaml` files start with the chart name the application uses as the
+top-level key. Further keys are specified in the same manner as the Helm chart
+configuration.
 
 Collector Apps
 --------------
 
-Within the ArgoCD Github repository, there are currently two collector applications: `auxtel` and `maintel`. The layout for these apps is different and explained here.
+Within the ArgoCD Github repository, there are currently two collector
+applications: `auxtel` and `maintel`. The layout for these apps is different and
+explained here.
 
 Chart.yaml
-  This file contains the specification of a new chart that will deploy a group of CSCs.
+  This file contains the specification of a new chart that will deploy a group
+  of CSCs.
 
 values.yaml
-  This file contains configuration parameters to fill out the application deployment. The keys will be discussed below.
+  This file contains configuration parameters to fill out the application
+  deployment. The keys will be discussed below.
 
 templates/<collector app name>.yaml
-  This file contains the ArgoCD Application API used to deploy the associated CSCs specified by the collector app configuration. One application is generated for each CSC listed in the configuration.
+  This file contains the ArgoCD Application API used to deploy the associated
+  CSCs specified by the collector app configuration. One application is
+  generated for each CSC listed in the configuration.
 
 .. list-table:: Collector Application YAML Configuration
    :widths: 10 20

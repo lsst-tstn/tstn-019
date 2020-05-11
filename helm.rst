@@ -1,14 +1,34 @@
 Helm Charts
 ===========
 
-The packaging of the CSC deployment starts with a `Helm <https://v2.helm.sh/>`_ chart. We using version 2 of Helm due the current ArgoCD restriction on the Helm version. The code for the charts are kept in the `Helm chart Github repository <https://github.com/lsst-ts/charts>`_. The next two sections will discuss each chart in detail. For a description of the APIs used, consult the `Kubernetes documentation <https://kubernetes.io/docs/reference/>`_ for the API reference. The chart sections will not go into great detail on the content of each API delivered. Each chart section will list all of the possible configuration aspects that each chart is delivering, but full use of that configuration is left to the `ArgoCD Configuration` section. For the CSC deployment, we will run a single container per pod on Kubernetes. The Kafka producers may follow a similar pattern, but they are allowed to scale beyond the single pod?
+The packaging of the CSC deployment starts with a `Helm <https://v2.helm.sh/>`_
+chart. We using version 2 of Helm due the current ArgoCD restriction on the Helm
+version. The code for the charts are kept in the
+`Helm chart Github repository <https://github.com/lsst-ts/charts>`_. The next
+two sections will discuss each chart in detail. For a description of the APIs
+used, consult the
+`Kubernetes documentation <https://kubernetes.io/docs/reference/>`_ for the API
+reference. The chart sections will not go into great detail on the content of
+each API delivered. Each chart section will list all of the possible
+configuration aspects that each chart is delivering, but full use of that
+configuration is left to the `ArgoCD Configuration` section. For the CSC
+deployment, we will run a single container per pod on Kubernetes. The Kafka
+producers may follow a similar pattern, but they are allowed to scale beyond
+the single pod?
 
 Kafka Producer Chart
 --------------------
 
-While not a true control component, the Kafka producers are nevertheless an important part of the control system landscape. They have the capability to convert the SAL messages into Kafka messages that are then ingested into the Engineering Facilities Database (EFD). See :cite:`SQR-034` for more details. 
+While not a true control component, the Kafka producers are nevertheless an
+important part of the control system landscape. They have the capability to
+convert the SAL messages into Kafka messages that are then ingested into the
+Engineering Facilities Database (EFD). See :cite:`SQR-034` for more details. 
 
-The chart consists of a single Kubernetes Workloads API: Deployment. The Deployment API allows for restarts if a particular pod dies which assists in keeping the producers up and running all the time. For each producer specified in the configuration, a deployment will be created. We will now cover the configuration options for the chart.
+The chart consists of a single Kubernetes Workloads API: Deployment. The
+Deployment API allows for restarts if a particular pod dies which assists in
+keeping the producers up and running all the time. For each producer specified
+in the configuration, a deployment will be created. We will now cover the
+configuration options for the chart.
 
 .. list-table:: Kafka Producer Chart YAML Configuration
    :widths: 15 25
@@ -68,28 +88,45 @@ The chart consists of a single Kubernetes Workloads API: Deployment. The Deploym
 .. [#] A given producer is given a name key that is used to identify that producer (e.g. auxtel).
 .. [#] The characters >- are used after the key so that the CSCs can be specified in a list
 
-.. NOTE:: The brokerIp, brokerPort and registryAddr of the env section are not overrideable in the producers.name.env section. Control of those items is on a site basis. All producers at a given site will always use the same information.
+.. NOTE:: The brokerIp, brokerPort and registryAddr of the env section are not
+          overrideable in the producers.name.env section. Control of those items
+          is on a site basis. All producers at a given site will always use the
+          same information.
 
 CSC Chart
 ---------
 
-Instead of having charts for every CSC, we employ an approach of having one chart that describes all the different CSC variants. There are four main variants that the chart supports:
+Instead of having charts for every CSC, we employ an approach of having one
+chart that describes all the different CSC variants. There are four main
+variants that the chart supports:
 
 simple
-  A CSC that requires no special interventions and uses only environment variables for configuration
+  A CSC that requires no special interventions and uses only environment
+  variables for configuration
 
 entrypoint
   A CSC that uses an override script for the container entrypoint.
 
 imagePullSecrets
-  A CSC that requires the use of the Nexus3 repository and need access credential for pulling the associated image
+  A CSC that requires the use of the Nexus3 repository and need access
+  credential for pulling the associated image
 
 volumeMount
-  A CSC that requires access to a physical disk store in order to transfer information into the running container
+  A CSC that requires access to a physical disk store in order to transfer
+  information into the running container
 
-The chart consists of the Job Kubernetes Workflows API, ConfigMap and PersistentVolumeClaim Kubernetes Config and Storage APIs and VaultSecret `Vault <https://www.vaultproject.io/>`_ API. The Job API is used to provide correct behavior when a CSC is sent of OFFLINE mode, the pod should not restart. The drawback to this is if a CSC dies for an unknown reason, not one caught by FAULT state transition, the pod will not restart and requires startup intervention. The other three APIs are used to support the non-simple CSC variants. They will be mentioned in the configuration description which we will turn to next.
+The chart consists of the Job Kubernetes Workflows API, ConfigMap and
+PersistentVolumeClaim Kubernetes Config and Storage APIs and VaultSecret
+`Vault <https://www.vaultproject.io/>`_ API. The Job API is used to provide
+correct behavior when a CSC is sent of OFFLINE mode, the pod should not restart.
+The drawback to this is if a CSC dies for an unknown reason, not one caught by
+FAULT state transition, the pod will not restart and requires startup
+intervention. The other three APIs are used to support the non-simple CSC
+variants. They will be mentioned in the configuration description which we will
+turn to next.
 
-.. warning:: The volumeMount variant is still in the development phase, so it is currently not supported.
+.. warning:: The volumeMount variant is still in the development phase, so it is
+             currently not supported.
 
 .. list-table:: CSC Chart YAML Configuration
    :widths: 15 25
@@ -128,7 +165,8 @@ Example env YAML section
     CSC_INDEX: 1
     CSC_MODE: 1
 
-The section can contain any number of environmental variables that are necessary for CSC configuration.
+The section can contain any number of environmental variables that are
+necessary for CSC configuration.
 
 Example entrypoint YAML section
 
@@ -145,17 +183,31 @@ Example entrypoint YAML section
 
   run_atdometrajectory.py
 
-The script must be entered line by line with an empty line between each one in order for the script to be created with the correct execution formatting. The pipe (|) at the end of the entrypoint keyword is required to help obtain the proper formatting. Using the entrypoint key activates the use of the ConfigMap API.
+The script must be entered line by line with an empty line between each one in
+order for the script to be created with the correct execution formatting. The
+pipe (|) at the end of the entrypoint keyword is required to help obtain the
+proper formatting. Using the entrypoint key activates the use of the ConfigMap
+API.
 
-.. NOTE:: The configurations that are associated with each chart do not represent the full range of component coverage. The `ArgoCD Configuration` handles that.
+.. NOTE:: The configurations that are associated with each chart do not
+          represent the full range of component coverage. The
+          `ArgoCD Configuration`
+          handles that.
 
 Packaging and Deploying Charts
 ------------------------------
 
-The Github repository has a README that contains information in how to package up a new chart for deployment to the `chart repository <https://lsst-ts.github.io/charts/>`_. First, ensure that the chart version has been updated in the `Chart.yaml` file. The step for creating/updating the index file needs one more flag for completeness.
+The Github repository has a README that contains information in how to package
+up a new chart for deployment to the
+`chart repository <https://lsst-ts.github.io/charts/>`_. First, ensure that the
+chart version has been updated in the `Chart.yaml` file. The step for
+creating/updating the index file needs one more flag for completeness.
 
 ::
 
   helm repo index --url=https://lsst-ts.github.io/charts .
 
-Once the version number is updated, the chart packaged and the index file updated, they can be collected into a single commit and pushed to master. That push to master will trigger the installation of the new chart into the chart repository. 
+Once the version number is updated, the chart packaged and the index file
+updated, they can be collected into a single commit and pushed to master. That
+push to master will trigger the installation of the new chart into the chart
+repository. 

@@ -1,20 +1,19 @@
 Helm Charts
 ===========
 
-The packaging of the CSC deployment starts with a `Helm <https://v2.helm.sh/>`_
-chart. We using version 2 of Helm due the current ArgoCD restriction on the Helm
-version. The code for the charts are kept in the
+The CSC deployment starts with a `Helm <https://v2.helm.sh/>`_ chart. We are
+currently adopting version 1.4 of ArgoCD which works with Helm version 2.
+The code for the charts are kept in the
 `Helm chart Github repository <https://github.com/lsst-ts/charts>`_. The next
 two sections will discuss each chart in detail. For a description of the APIs
 used, consult the
-`Kubernetes documentation <https://kubernetes.io/docs/reference/>`_ for the API
-reference. The chart sections will not go into great detail on the content of
+`Kubernetes documentation <https://kubernetes.io/docs/reference/>`_ reference.
+The chart sections will not go into great detail on the content of
 each API delivered. Each chart section will list all of the possible
 configuration aspects that each chart is delivering, but full use of that
 configuration is left to the `ArgoCD Configuration` section. For the CSC
 deployment, we will run a single container per pod on Kubernetes. The Kafka
-producers may follow a similar pattern, but they are allowed to scale beyond
-the single pod?
+producers will follow the same pattern.
 
 Kafka Producer Chart
 --------------------

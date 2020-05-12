@@ -40,6 +40,10 @@
 
 .. Please do not modify tocdepth; will be fixed when a new Sphinx theme is shipped.
 
+.. note:: This document presents the infrastructure and operation of
+          containerized component deployment for the Vera C. Rubin Observatory.
+
+
 .. sectnum::
 
 Introduction

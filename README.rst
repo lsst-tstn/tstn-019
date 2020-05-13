@@ -14,7 +14,7 @@ Deployment of Containerized Control System Components
 TSTN-019
 ========
 
-This document describes the operational system for deploying containerize control system components to Kubernetes resources.
+This document describes the operational system for deploying containerized control system components to Kubernetes resources.
 
 **Links:**
 

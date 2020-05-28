@@ -15,6 +15,44 @@ configuration is left to the `ArgoCD Configuration` section. For the CSC
 deployment, we will run a single container per pod on Kubernetes. The Kafka
 producers will follow the same pattern.
 
+Cluster Configuration Chart
+---------------------------
+
+This chart (`cluster-config`) is responsible for setting up all of the
+namespaces for a Kubernetes cluster by using Namespace from the Kubernetes
+Cluster API. Its only configuration is a list of namespaces that the cluster
+will use.
+
+.. list-table:: Cluster Configuration Chart YAML Configuration
+   :widths: 15 25
+   :header-rows: 1
+
+   * - YAML Key
+     - Description
+   * - namespaces
+     - This holds a list of namespaces for the cluster
+
+OSPL Configuration Chart
+------------------------
+
+This chart (`ospl-config`) is responsible for ensuring the network interface
+for OpenSplice DDS communication is set to listen to the proper one on a
+Kubernetes cluster. The `multus` CNI provides the multicast interface on the
+Kubernetes cluster for the pods. The chart uses ConfigMap from the Kubernetes
+Config and Storage API to provide the `ospl.xml` file for all of the cluster's
+namespaces.
+
+.. list-table:: OSPL Configuration Chart YAML Configuration
+   :widths: 15 25
+   :header-rows: 1
+
+   * - YAML Key
+     - Description
+   * - namespaces
+     - This holds a list of namespaces for the cluster
+   * - networkInterface
+     - The name of the `multus` CNI interface
+
 Kafka Producer Chart
 --------------------
 

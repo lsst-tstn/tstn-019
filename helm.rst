@@ -11,9 +11,9 @@ used, consult the
 The chart sections will not go into great detail on the content of
 each API delivered. Each chart section will list all of the possible
 configuration aspects that each chart is delivering, but full use of that
-configuration is left to the `ArgoCD Configuration` section. For the CSC
-deployment, we will run a single container per pod on Kubernetes. The Kafka
-producers will follow the same pattern.
+configuration is left to the `ArgoCD Configuration` section and examples will
+be provided there. For the CSC deployment, we will run a single container per
+pod on Kubernetes. The Kafka producers will follow the same pattern.
 
 Cluster Configuration Chart
 ---------------------------
@@ -81,6 +81,9 @@ configuration options for the chart.
      - The tag of the container image to use for the producers
    * - image.pullPolicy
      - The policy to apply when pulling an image for deployment
+   * - image.nexus3
+     - The tag name for the Nexus3 Docker repository secrets if private images
+       need to be pulled
    * - env
      - This section holds environment configuration for the producer container
    * - env.lsstDdsDomain
@@ -120,15 +123,18 @@ configuration options for the chart.
    * - producers.name.env.replication
      - The number of replications available to the named producer
    * - producers.name.env.logLevel
-     - This value determines the logging level for the named producer     
+     - This value determines the logging level for the named producer
+   * - namespace
+     - This is the namespace in which the producers will be placed
 
 .. [#] A given producer is given a name key that is used to identify that producer (e.g. auxtel).
 .. [#] The characters >- are used after the key so that the CSCs can be specified in a list
 
 .. NOTE:: The brokerIp, brokerPort and registryAddr of the env section are not
-          overrideable in the producers.name.env section. Control of those items
-          is on a site basis. All producers at a given site will always use the
-          same information.
+          overrideable in the producers.name.env section. The nexus3 of the 
+          image section is not overrideable in the producers.name.image section.
+          Control of those items is on a site basis. All producers at a given
+          site will always use the same information.
 
 CSC Chart
 ---------
@@ -146,24 +152,21 @@ entrypoint
 
 imagePullSecrets
   A CSC that requires the use of the Nexus3 repository and need access
-  credential for pulling the associated image
+  credentials for pulling the associated image
 
 volumeMount
   A CSC that requires access to a physical disk store in order to transfer
   information into the running container
 
 The chart consists of the Job Kubernetes Workflows API, ConfigMap and
-PersistentVolumeClaim Kubernetes Config and Storage APIs and VaultSecret
-`Vault <https://www.vaultproject.io/>`_ API. The Job API is used to provide
-correct behavior when a CSC is sent of OFFLINE mode, the pod should not restart.
-The drawback to this is if a CSC dies for an unknown reason, not one caught by
-FAULT state transition, the pod will not restart and requires startup
-intervention. The other three APIs are used to support the non-simple CSC
-variants. They will be mentioned in the configuration description which we will
-turn to next.
-
-.. warning:: The volumeMount variant is still in the development phase, so it is
-             currently not supported.
+PersistentVolumeClaim Kubernetes Config and Storage APIs. The Job API is used
+to provide correct behavior when a CSC is sent of OFFLINE mode, the pod should
+not restart. If the CSC dies for an unknown reason, not one caught by a
+FAULT state transition, a new pod will be started and the CSC will then come up
+in its lowest control state. The old pod will remain in a failed state, but
+available for interrogation about the problem. The other APIs are used to
+support the non-simple CSC variants. They will be mentioned in the configuration
+description which we will turn to next.
 
 .. list-table:: CSC Chart YAML Configuration
    :widths: 15 25
@@ -179,57 +182,38 @@ turn to next.
      - The tag of the container image to use for the CSC
    * - image.pullPolicy
      - The policy to apply when pulling an image for deployment
-   * - image.useNexus3 [#]_
-     - This key activates the VaultSecret API for secure image pulls
-   * - env [#]_
+   * - image.nexus3
+     - The tag name for the Nexus3 Docker repository secrets if private images
+       need to be pulled
+   * - namespace
+     - This is the namespace in which the CSC will be placed
+   * - env
      - This section holds a set of key, value pairs for environmental variables
-   * - entrypoint [#]_
+   * - entrypoint
      - This key allows specification of a script to override the entrypoint
-   * - deployEnv [#]_
-     - This key assists the VaultSecret in knowing where to look for credentials
+   * - mountpoint
+     - This section holds the information necessary to create a volume mount
+       for the container.
+   * - mountpoint.name
+     - A label identifier for the mountpoint
+   * - mountpoint.path
+     - The path inside the container to mount
+   * - mountpoint.accessMode [#]_
+     - This sets the required access mode for the volume mount.
+   * - mountpoint.ids
+     - This section contains UID and GID overrides
+   * - mountpoint.ids.uid
+     - An alternative UID for mounting
+   * - mountpoint.ids.gid
+     - An alternative GID for mounting
+   * - mountpoint.claimSize
+     - The requested physical disk space size for the volume mount
 
-.. [#] The value of the key is not used, but use true for the value
-.. [#] See env example below
-.. [#] Format is important. See entrypoint example below
-.. [#] The name is site specific and handled in the ArgoCD configuration
-
-Example env YAML section
-
-::
-
-  env:
-    LSST_DDS_DOMAIN: mytest
-    CSC_INDEX: 1
-    CSC_MODE: 1
-
-The section can contain any number of environmental variables that are
-necessary for CSC configuration.
-
-Example entrypoint YAML section
-
-::
-
-  entrypoint: |
-  #!/usr/bin/env bash
-
-  source ~/miniconda3/bin/activate
-
-  source $OSPL_HOME/release.com
-
-  source /home/saluser/.bashrc
-
-  run_atdometrajectory.py
-
-The script must be entered line by line with an empty line between each one in
-order for the script to be created with the correct execution formatting. The
-pipe (|) at the end of the entrypoint keyword is required to help obtain the
-proper formatting. Using the entrypoint key activates the use of the ConfigMap
-API.
+.. [#] Definitions can be found `here <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes>`_.
 
 .. NOTE:: The configurations that are associated with each chart do not
           represent the full range of component coverage. The
-          `ArgoCD Configuration`
-          handles that.
+          `ArgoCD Configuration` handles that.
 
 Packaging and Deploying Charts
 ------------------------------

@@ -442,3 +442,64 @@ is available. A configuration might look like the following.
 
 The description of the `claimSize` units can be found at this
 `page <https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory>`_.
+
+Collector Applications
+~~~~~~~~~~~~~~~~~~~~~~
+
+As noted earlier, these applications are collections of individual CSC apps
+aligned with a particular subsystem. The main configuration is the list of CSC
+apps to include on launch. Here is how the ``values.yaml`` file for the
+``maintel`` app looks.
+
+::
+
+  spec:
+    destination:
+      server: https://kubernetes.default.svc
+    source:
+      repoURL: https://github.com/lsst-ts/argocd-csc
+      targetRevision: HEAD
+
+  env: ncsa-teststand
+
+  cscs:
+    - mtaos
+    - mtcamhexapod
+    - mtm1m3
+    - mtm2
+    - mtm2hexapod
+    - mtmount
+    - mtptg
+    - mtrotator
+
+  noSim:
+    - mtptg
+
+The `spec` section is specific to ArgoCD and should not be changed unless you
+really understand the consequences. The exceptions to this are the `repoURL`
+and `targetRevision` parameters. It is possible the Github repository moves
+during the lifetime of
+the project, so `repoURL` will need to be updated if that happens. There might
+also be a need to testing something that is not on the ``master`` branch of
+the repository. To support that, change the `targetRevision` to the
+appropriate branch name. Use this sparingly, as main configuration tracking is
+on the ``master`` branch. The `env` parameter sets the ``value-<env>.yaml`` for
+the listed CSC apps. This will change on a per site basis. The `cscs` parameter
+is the listing of the CSC apps that the collector app will control. This can
+also be changed on a per site basis.
+
+As an example of per site configuration, below is an example for the summit
+configuration of the ``maintel`` app.
+
+::
+
+  env: summit
+
+  cscs:
+    - mtaos
+    - mtptg
+
+As you can see, the `env` parameter is overridden to the correct name and the
+list of CSCs is much shorter. This is due to the presence of real hardware on
+the summit. The ``auxtel`` collector app follows similar configuration
+mechanisms but controls a different list of CSC apps.

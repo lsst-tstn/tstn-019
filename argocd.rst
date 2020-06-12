@@ -339,7 +339,7 @@ specific namespace is shown below.
   csc:
     namespace: maintel
 
-CSCs may have other values the need to applied regardless of site. Here is an
+CSCs may have other values they need to applied regardless of site. Here is an
 example from the ``mtcamhexapod`` application.
 
 ::
@@ -356,8 +356,8 @@ this manner.
 
 The Docker image configuration is handled on a site basis to allow independent
 evolution. This also applies to the ``LSST_DDS_DOMAIN`` environment variable
-since those are definitely site specific. An example site configuration from the
-``mtcamhexapod`` for the NCSA test stand.
+since those are definitely site specific. Below is an example site configuration
+from the ``mtcamhexapod`` for the NCSA test stand.
 
 ::
 
@@ -374,8 +374,8 @@ Other site specific environment variables can be listed in the `env` section if
 they are appropriate to running the CSC container.
 
 Containers that require the use of the Nexus3 repository, currently identified
-by the use of ``ts-dockerhub.lsst.org`` in the `image.repository` name need to configure the
-`image.nexus3` key in order for secret access to occur. An example 
+by the use of ``ts-dockerhub.lsst.org`` in the `image.repository` name, need to
+configure the `image.nexus3` key in order for secret access to occur. An example 
 ``values.yaml`` file for the ``mtptg`` is shown below.
 
 ::
@@ -437,7 +437,7 @@ is available. A configuration might look like the following.
     mountpoint:
       - name: www
         path: /home/saluser/www
-        accessMode: ReadWriteMany
+        accessMode: ReadWriteOnce
         claimSize: 50Gi
 
 The description of the `claimSize` units can be found at this

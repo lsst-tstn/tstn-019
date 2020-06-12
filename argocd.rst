@@ -271,6 +271,7 @@ Here is an example from the ``values-ncsa-teststand.yaml``.
       registryAddr: https://lsst-schema-registry-nts-efd.ncsa.illinois.edu
       partitions: 1
       replication: 3
+      waitAck: 1
       logLevel: 20
 
 The `env` information is specifically tailored for the NCSA teststand. The 
@@ -296,6 +297,7 @@ of doing all the above.
       registryAddr: https://lsst-schema-registry-nts-efd.ncsa.illinois.edu
       partitions: 1
       replication: 3
+      waitAck: 1
       logLevel: 20
 
     producers:

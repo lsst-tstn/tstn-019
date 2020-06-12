@@ -98,6 +98,8 @@ configuration options for the chart.
      - The number of partitions that the producers are supporting
    * - env.replication
      - The number of replications available to the producers
+   * - env.waitAck
+     - The number of Kafka brokers to wait for an ack from
    * - env.logLevel
      - This value determines the logging level for the producers
    * - producers
@@ -122,6 +124,9 @@ configuration options for the chart.
      - The number of partitions that the named producer is supporting
    * - producers.name.env.replication
      - The number of replications available to the named producer
+   * - producers.name.env.waitAck
+     - The number of Kafka brokers to wait for an ack from for the named
+       producer
    * - producers.name.env.logLevel
      - This value determines the logging level for the named producer
    * - namespace

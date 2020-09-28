@@ -38,9 +38,10 @@ OSPL Configuration Chart
 This chart (`ospl-config`) is responsible for ensuring the network interface
 for OpenSplice DDS communication is set to listen to the proper one on a
 Kubernetes cluster. The `multus` CNI provides the multicast interface on the
-Kubernetes cluster for the pods. The chart uses ConfigMap from the Kubernetes
-Config and Storage API to provide the `ospl.xml` file for all of the cluster's
-namespaces.
+Kubernetes cluster for the pods. The rest of the options deal with configuring
+the shared memory configuration the control system is using. The chart uses
+ConfigMap from the Kubernetes Config and Storage API to provide the `ospl.xml`
+file for all of the cluster's namespaces.
 
 .. list-table:: OSPL Configuration Chart YAML Configuration
    :widths: 15 25
@@ -52,6 +53,73 @@ namespaces.
      - This holds a list of namespaces for the cluster
    * - networkInterface
      - The name of the `multus` CNI interface
+   * - domainId
+     - This sets the domain ID for the DDS communication
+   * - shmemSize
+     - The size in bytes of the shared memory database
+   * - maxSamplesWarnAt
+     - The maximum number of samples at which the system warns of resource
+       issues
+   * - schedulingClass
+     - The thread scheduling class that will be used by a daemon service
+   * - schedulingPriority
+     - The scheduling priority that will be used by a daemon service
+   * - monitorStackSize
+     - The stack size in bytes for the daemon service
+   * - waterMarksWhcHigh
+     - This sets the size of the high watermark. Units must be explicitly used
+   * - deliveryQueueMaxSamples
+     - This controls the maximum size of the delivery queue in samples
+   * - dsGracePeriod
+     - This sets the discovery time grace period. Time units must be specified
+   * - squashParticipants
+     - This controls whether one virtual (true) or all (false) domain
+       participants as shown at discovery time
+   * - namespacePolicyAlignee
+     - This determines how the durability service manages the data that matches
+       the namespace
+
+OSPL Daemon Chart
+-----------------
+
+This chart (`ospl-daemon`) handles deploying the OSPL daemon service for the 
+shared memory configuration. This daemon takes over the communcation startup, 
+handling and teardown from the individual CSC applications. The chart uses a
+DaemonSet from the Kubernetes Workload APIs since it is designed to run on
+every node of a Kubernetes cluster.
+
+.. list-table:: OSPL Daemon Chart YAML Configuration
+   :widths: 15 25
+   :header-rows: 1
+
+   * - YAML Key
+     - Description
+   * - image
+     - This section holds the configuration of the container image
+   * - image.repository
+     - The Docker registry name of the container image to use for the producers
+   * - image.tag
+     - The tag of the container image to use for the producers
+   * - image.pullPolicy
+     - The policy to apply when pulling an image for deployment
+   * - image.nexus3
+     - The tag name for the Nexus3 Docker repository secrets if private images
+       need to be pulled
+   * - namespace
+     - This is the namespace in which the CSC will be placed
+   * - env
+     - This section holds a set of key, value pairs for environmental variables
+   * - osplVersion
+     - This is the version of the commercial OpenSplice library to run. It is
+       used to set the location of the OSPL configuration file
+   * - shmemDir
+     - This is the path to the Kubernetes local store where the shared memory
+       database will be written
+   * - useHostIpc
+     - This sets the use of the host inter-process communication system.
+       Defaults to true
+   * - useHostPid
+     - This sets the use of the host process ID system. Defaults to true
 
 Kafka Producer Chart
 --------------------
@@ -86,8 +154,8 @@ configuration options for the chart.
        need to be pulled
    * - env
      - This section holds environment configuration for the producer container
-   * - env.lsstDdsDomain
-     - The LSST_DDS_DOMAIN name applied to all producer containers
+   * - env.lsstDdsPartitionPrefix
+     - The LSST_DDS_PARTITION_PREFIX name applied to all producer containers
    * - env.brokerIp
      - The URI for the Kafka broker that received the generated Kafka messages
    * - env.brokerPort
@@ -102,6 +170,8 @@ configuration options for the chart.
      - The number of Kafka brokers to wait for an ack from
    * - env.logLevel
      - This value determines the logging level for the producers
+   * - env.extras
+     - This section holds a set of key, value pairs for environmental variables
    * - producers
      - This section holds the configuration of the individual producers [#]_
    * - producers.name
@@ -118,8 +188,8 @@ configuration options for the chart.
      - The policy to apply when pulling an image for named producer deployment
    * - producers.name.env
      - This section provides optional override of the defaults env section
-   * - producers.name.env.lsstDdsDomain
-     - The LSST_DDS_DOMAIN name applied the named producer container
+   * - producers.name.env.lsstDdsPartitionPrefix
+     - The LSST_DDS_PARTITION_PREFIX name applied the named producer container
    * - producers.name.env.partitions
      - The number of partitions that the named producer is supporting
    * - producers.name.env.replication
@@ -129,8 +199,22 @@ configuration options for the chart.
        producer
    * - producers.name.env.logLevel
      - This value determines the logging level for the named producer
+   * - producers.name.env.extras
+     - This section holds a set of key, value pairs for environmental variables
+       for the named producer
    * - namespace
      - This is the namespace in which the producers will be placed
+   * - osplVersion
+     - This is the version of the commercial OpenSplice library to run. It is
+       used to set the location of the OSPL configuration file
+   * - shmemDir
+     - This is the path to the Kubernetes local store where the shared memory
+       database will be written
+   * - useHostIpc
+     - This sets the use of the host inter-process communication system.
+       Defaults to true
+   * - useHostPid
+     - This sets the use of the host process ID system. Defaults to true
 
 .. [#] A given producer is given a name key that is used to identify that producer (e.g. auxtel).
 .. [#] The characters >- are used after the key so that the CSCs can be specified in a list
@@ -213,6 +297,17 @@ description which we will turn to next.
      - An alternative GID for mounting
    * - mountpoint.claimSize
      - The requested physical disk space size for the volume mount
+   * - osplVersion
+     - This is the version of the commercial OpenSplice library to run. It is
+       used to set the location of the OSPL configuration file
+   * - shmemDir
+     - This is the path to the Kubernetes local store where the shared memory
+       database will be written
+   * - useHostIpc
+     - This sets the use of the host inter-process communication system.
+       Defaults to true
+   * - useHostPid
+     - This sets the use of the host process ID system. Defaults to true
 
 .. [#] Definitions can be found `here <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes>`_.
 

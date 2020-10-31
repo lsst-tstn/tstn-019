@@ -78,6 +78,21 @@ file for all of the cluster's namespaces.
    * - namespacePolicyAlignee
      - This determines how the durability service manages the data that matches
        the namespace
+   * - domainReportEnabled
+     - This enables reporting at the Domain level
+   * - ddsi2TracingEnabled
+     - This enables tracing for the DDSI2 service
+   * - ddsi2TracingVerbosity
+     - This sets the level of information for the DDSI2 tracing
+   * - ddsi2TracingLogfile
+     - This specifies the location and name of the DDSI2 tracing log
+   * - durabilityServiceTracingEnabled
+     - This enables tracing for the Durability service
+   * - durabilityServiceTracingVerbosity
+     - This sets the level of information for the Durability tracing
+   * - durabilityServiceTracingLogfile
+     - This specifies the location and name of the Durability tracing log
+
 
 OSPL Daemon Chart
 -----------------

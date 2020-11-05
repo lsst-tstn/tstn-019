@@ -10,10 +10,12 @@ the concept of an app of apps (or chart of charts). Each app requires a specific
 chart or charts to use in order to deploy. 
 
 Each component has its own directory within the top-level ``apps`` directory.
-This includes the cluster configuration, OSPL configuration, Kafka producers and
-the CSCs. There are a few special apps, cluster configuration and app which
-collect the main CSC component apps into a group (further called collector
-apps). Those will be discussed later. 
+This includes the cluster configuration, OSPL configuration, OSPL daemon,
+Kafka producers and the CSCs. There are a few special apps which collect the
+main CSC component apps into a group (further called collector apps). Those
+will be discussed later. Some applications have extra support included that are
+not present in the application chart. That extra support will be explained 
+within the appropriate section.
 
 The contents found within the application directories have roughly the same
 content.
@@ -49,7 +51,7 @@ values-<site tag>.yaml
    * - summit
      - Cerro Pachon Control System Infrastructure
    * - tucson-teststand
-     - Tucson Test Stand. This is now largely defunct
+     - Tucson Test Stand
 
 templates
   This directory may not appear in all configurations. It will contain other
@@ -77,20 +79,21 @@ chart level configuration.
    * - deployEnv
      - The site tag to use when setting up the namespace secrets
 
-The default configuration contains the following four namespaces and are used in
-the Kafka producer and CSC applications.
+The default configuration contains the following five namespaces and are used in
+the OSPL daemon, Kafka producer and CSC applications.
 
 - auxtel
 - maintel
 - obssys
 - kafka-producers
+- ospl-daemon
 
 Collector Apps
 --------------
 
-Within the ArgoCD Github repository, there are currently two collector
-applications: ``auxtel`` and ``maintel``. The layout for these apps is different
-and explained here.
+Within the ArgoCD Github repository, there are currently three collector
+applications: ``auxtel``, ``maintel`` and ``obssys``. The layout for these apps
+is different and explained here.
 
 Chart.yaml
   This file contains the specification of a new chart that will deploy a group
@@ -129,6 +132,29 @@ templates/<collector app name>.yaml
      - This key holds a list of CSCs that are associated with the app
    * - noSim
      - This key holds a list of CSCs that do not have a simulator capability
+
+CSCs with Special Support
+-------------------------
+
+This section will detail any CSC applications that require special support that
+is outside the supplied chart.
+
+Hexapodsim
+~~~~~~~~~~
+
+The ``athexapod`` application requires the use of a simulated hexapod
+low-level controller when running in simulation mode. This simulator
+(``hexapodsim``) is accessed by a specific IP address and port. The
+``hexapodsim`` app uses a Service from the Kubernetes Service APIs to setup
+the port. Kubernetes conjoins that with the deployed pod IP in an environment
+variable: ``HEXAPOD_SIM_SERVICE_HOST``. The ATHexapod CSC code uses that
+variable to set the proper connection information. 
+
+.. NOTE:: ``hexapodsim`` uses version 0.4.1 of the ``csc`` Helm chart. The use
+          of this older chart is due to that application not being an OSPL
+          client and therefore does not need any of the new shared memory
+          support. This may be changed to a chart that contains no OSPL features
+          in the future.
 
 Examples
 --------
@@ -171,6 +197,7 @@ The main ``values.yaml`` file looks like:
       - maintel
       - obssys
       - kafka-producers
+      - ospl-daemon
 
 This sets the namespaces for all sites. This configuration can be overridden on
 a per site basis, but it is not recommended for production environments such as
@@ -210,12 +237,50 @@ and only one configuration for this application.
       - maintel
       - obssys
       - kafka-producers
-
-    networkInterface: net1
+      - ospl-daemon
+    domainId: 0
+    shmemSize: 104857600
+    maxSamplesWarnAt: 50000
+    schedulingClass: Default
+    schedulingPriority: 0
+    monitorStackSize: 6000000
+    waterMarksWhcHigh: 8MB
+    deliveryQueueMaxSamples: 10000
+    squashParticipants: true
+    namespacePolicyAlignee: Lazy
 
 The list of namespaces MUST contain at least the same namespaces as
 ``cluster-config``. The `networkInterface` is the name specified by the
-``multus`` CNI and is the same for all sites that we currently deploy to.
+``multus`` CNI and is the same for all sites that we currently deploy to. The
+rest of the configuration is meant for handling setup, services and features
+related to the shared memory configuration. Again, they are typically set once
+per site and are normally propogated to all sites we deploy to.
+
+If one wants to adjust configuration parameters for testing without effecting
+other sites, a site specific configuration file can be used.
+
+OSPL Daemon Configuration
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The OSPL daemon configuration has a global ``values.yaml`` file that sets the
+namespace for all sites. All other configuration should be handled in a site
+YAML configuration file. Below is the configuration from the
+``values-ncsa-teststand.yaml`` configuration file.
+
+::
+
+  ospl-daemon:
+    image:
+      repository: ts-dockerhub.lsst.org/ospl-daemon 
+      tag: c0013
+      pullPolicy: Always
+      nexus3: nexus3-docker
+    env:
+      LSST_DDS_PARTITION_PREFIX: ncsa
+      OSPL_INFOFILE: /tmp/ospl-info-daemon.log
+      OSPL_ERRORFILE: /tmp/ospl-error-daemon.log
+    shmemDir: /scratch.local/ospl
+    osplVersion: V6.10.4
 
 Kafka Producer Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -357,7 +422,7 @@ the container will run. Other global environment variables can be specified in
 this manner.
 
 The Docker image configuration is handled on a site basis to allow independent
-evolution. This also applies to the ``LSST_DDS_DOMAIN`` environment variable
+evolution. This also applies to the ``LSST_DDS_PARTITION_PREFIX`` environment variable
 since those are definitely site specific. Below is an example site configuration
 from the ``mtcamhexapod`` for the NCSA test stand.
 
@@ -370,7 +435,7 @@ from the ``mtcamhexapod`` for the NCSA test stand.
       pullPolicy: Always
 
     env:
-      LSST_DDS_DOMAIN: ncsa 
+      LSST_DDS_PARTITION_PREFIX: ncsa 
 
 Other site specific environment variables can be listed in the `env` section if
 they are appropriate to running the CSC container.
@@ -407,7 +472,7 @@ below.
       pullPolicy: Always
 
     env:
-      LSST_DDS_DOMAIN: lsatmcs
+      LSST_DDS_PARTITION_PREFIX: lsatmcs
 
     entrypoint: |
       #!/usr/bin/env bash
@@ -504,4 +569,5 @@ configuration of the ``maintel`` app.
 As you can see, the `env` parameter is overridden to the correct name and the
 list of CSCs is much shorter. This is due to the presence of real hardware on
 the summit. The ``auxtel`` collector app follows similar configuration
-mechanisms but controls a different list of CSC apps.
+mechanisms but controls a different list of CSC apps as does the ``obssys``
+collector app.

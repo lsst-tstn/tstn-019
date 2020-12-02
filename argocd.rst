@@ -27,6 +27,9 @@ values.yaml
   This file contains base information that will apply to all site specific configuration.
   May not be present in all applications.
 
+.. warning:: Any changes to the ``values.yaml`` will be seen by all sites at
+             once, so give careful thought to adjustments there.
+
 values-<site tag>.yaml
   This file contains site specific information for the configuration.
   It may override configuration provided in the ``values.yaml`` file.
@@ -38,12 +41,10 @@ values-<site tag>.yaml
 
    * - Site Tag
      - Site Location
-   * - base
+   * - base-teststand
      - La Serena Base Data Center
    * - ncsa-teststand
      - NCSA Test Stand
-   * - ncsa-lsp-int
-     - LSP-int at NCSA
    * - summit
      - Cerro Pachon Control System Infrastructure
    * - tucson-teststand
@@ -73,18 +74,10 @@ This requires a configuration parameter that is outside the chart level configur
    * - deployEnv
      - The site tag to use when setting up the namespace secrets
 
-The default configuration contains the following five namespaces and are used in the OSPL daemon, Kafka producer and CSC applications.
-
-- auxtel
-- maintel
-- obssys
-- kafka-producers
-- ospl-daemon
-
 Collector Apps
 --------------
 
-Within the ArgoCD Github repository, there are currently three collector applications: ``auxtel``, ``maintel`` and ``obssys``.
+Within the ArgoCD Github repository, there are currently four collector applications: ``auxtel``, ``eas`` ``maintel`` and ``obssys``.
 The layout for these apps is different and explained here.
 
 Chart.yaml
@@ -122,11 +115,17 @@ templates/<collector app name>.yaml
      - This key holds a list of CSCs that are associated with the app
    * - noSim
      - This key holds a list of CSCs that do not have a simulator capability
+   * - runAsSim
+     - This key holds a list of CSCs that are run in simulator mode at the summit
+   * - indexed
+     - This key holds a set of key-value pairs for indexed components that specify the length of the component name
+   * - indexed.<csc name>
+     - This contains the numeric value specifying the length of the <csc name> key
 
-CSCs with Special Support
+Apps with Special Support
 -------------------------
 
-This section will detail any CSC applications that require special support that is outside the supplied chart.
+This section will detail any applications that require special support that is outside the supplied chart.
 
 Hexapodsim
 ~~~~~~~~~~
@@ -135,11 +134,17 @@ The ``athexapod`` application requires the use of a simulated hexapod low-level 
 This simulator (``hexapodsim``) is accessed by a specific IP address and port.
 The ``hexapodsim`` app uses a Service from the Kubernetes Service APIs to setup the port.
 Kubernetes conjoins that with the deployed pod IP in an environment variable: ``HEXAPOD_SIM_SERVICE_HOST``.
-The ATHexapod CSC code uses that variable to set the proper connection information. 
+The ATHexapod CSC code uses that variable to set the proper connection information.
+The ``hexapodsim`` application has its own chart that uses Deployment from the Kubernetes Workloads API.
+This chart contains no OSPL features since the simulator does not require it.
+The use of the Deployment allows the application to be brought up with the ``auxtel`` collector app, but remain up if the CSCs are taken down since those are run as Jobs.
 
-.. NOTE:: ``hexapodsim`` uses version 0.4.1 of the ``csc`` Helm chart. 
-          The use of this older chart is due to that application not being an OSPL client and therefore does not need any of the new shared memory support.
-          This may be changed to a chart that contains no OSPL features in the future.
+Header Service
+~~~~~~~~~~~~~~
+
+Both the ``aheaderservice`` and ``ccheaderservice`` apps require the use of an Ingress and Service Kubernetes APIs.
+This is only necessary while the header services apps leverage an internal web service for header file exposition.
+Once the header service moves to using the S3 LFA, the extra APIs will be removed.
 
 Examples
 --------
@@ -150,9 +155,7 @@ ArgoCD level configuration files follow this general format.
 
   chart-name:
     chart-key1: values
-
     chart-key2: values
-
     ...
 
 If a given application uses extra APIs for deployment, those configurations will
@@ -161,9 +164,7 @@ look like the following.
 ::
 
   api-key1: values
-
   api-key2: values
-
   ...
 
 Refer to the appropriate `Helm Chart` section for chart level key descriptions.
@@ -179,22 +180,23 @@ The main ``values.yaml`` file looks like:
   cluster-config:
     namespaces:
       - auxtel
+      - eas
       - maintel
       - obssys
       - kafka-producers
       - ospl-daemon
 
 This sets the namespaces for all sites.
-This configuration can be overridden on a per site basis, but it is not recommended for production environments such as the summit, base and NCSA test stand.
+This configuration can be overridden on a per site basis, but it is not recommended for summit environment.
 
-The site specific configuration files only need to contain the `deployEnv` keyword.
+The site specific configuration files only needs to contain the `deployEnv` keyword.
 The ``values-ncsa-teststand.yaml`` is shown as an example.
 
 ::
 
   deployEnv: ncsa-teststand
 
-If one does want to override the list of namespaces for a particular site, this is how it would be done for a site specific file.
+If you want to override the list of namespaces for a particular site, this is how it would be done for a site specific file.
 
 ::
 
@@ -210,19 +212,20 @@ OSPL Configuration
 ~~~~~~~~~~~~~~~~~~
 
 This is the ``ospl-config`` directory within the ArgoCD repository.
-There is one and only one configuration for this application.
+The all-site configuration in ``values.yaml`` looks like this.
 
 ::
 
   ospl-config:
     namespaces:
       - auxtel
+      - eas
       - maintel
       - obssys
       - kafka-producers
       - ospl-daemon
-    domainId: 0
-    shmemSize: 104857600
+    networkInterface: net1
+    shmemSize: 504857600
     maxSamplesWarnAt: 50000
     schedulingClass: Default
     schedulingPriority: 0
@@ -231,52 +234,54 @@ There is one and only one configuration for this application.
     deliveryQueueMaxSamples: 10000
     squashParticipants: true
     namespacePolicyAlignee: Lazy
-
-The list of namespaces MUST contain at least the same namespaces as
+    domainReportEnabled: false
+    ddsi2TracingEnabled: false
+    ddsi2TracingVerbosity: finer
+    ddsi2TracingLogfile: stdout
+    durabilityServiceTracingEnabled: false
+    durabilityServiceTracingVerbosity: FINER
+    durabilityServiceTracingLogfile: stdout
+ 
+The list of namespaces *MUST* contain at least the same namespaces as
 ``cluster-config``.
 The `networkInterface` is the name specified by the ``multus`` CNI and is the same for all sites that we currently deploy to.
 The rest of the configuration is meant for handling setup, services and features
 related to the shared memory configuration.
-Again, they are typically set once per site and are normally propogated to all sites we deploy to.
-
-If one wants to adjust configuration parameters for testing without effecting
+If you want to adjust configuration parameters for testing without effecting
 other sites, a site specific configuration file can be used.
 
 OSPL Daemon Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The OSPL daemon configuration has a global ``values.yaml`` file that sets the
-namespace for all sites.
+namespace, OSPL log files and OSPL version for all sites.
 All other configuration should be handled in a site YAML configuration file.
-Below is the configuration from the ``values-ncsa-teststand.yaml`` configuration file.
+The configuration from the ``values-summit.yaml`` configuration file is shown below.
 
 ::
 
   ospl-daemon:
     image:
-      repository: ts-dockerhub.lsst.org/ospl-daemon 
-      tag: c0013
+      repository: ts-dockerhub.lsst.org/ospl-daemon
+      tag: c0016
       pullPolicy: Always
       nexus3: nexus3-docker
     env:
-      LSST_DDS_PARTITION_PREFIX: ncsa
-      OSPL_INFOFILE: /tmp/ospl-info-daemon.log
-      OSPL_ERRORFILE: /tmp/ospl-error-daemon.log
-    shmemDir: /scratch.local/ospl
-    osplVersion: V6.10.4
+      LSST_DDS_PARTITION_PREFIX: summit
+    shmemDir: /run/ospl
 
 Kafka Producer Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The Kafka producer configuration has a global ``values.yaml`` file that sets the
-namespace and producer CSC configuration for all sites.
+namespace, OSPL log files and OSPL version and producer CSC configuration for all sites.
 A snippet of the configuration is shown below.
 
 ::
 
   kafka-producers:
     namespace: kafka-producers
-
+    ...
     producers:
       auxtel:
         cscs: >-
@@ -298,9 +303,6 @@ A snippet of the configuration is shown below.
 Each key under `producers` is the name for that given producer along with the
 list of CSCs that producer will monitor. 
 
-.. warning:: Any changes to the ``values.yaml`` will be seen by all sites at
-             once, so give careful thought to adjustments there.
-
 The Docker image and other producer configuration is handled on a site basis.
 Here is an example from the ``values-ncsa-teststand.yaml``. 
 
@@ -308,10 +310,10 @@ Here is an example from the ``values-ncsa-teststand.yaml``.
 
   kafka-producers:
     image:
-      repository: lsstts/salkafka
-      tag: v1.1.2_salobj_v5.11.0_xml_v5.1.0
+      repository: ts-dockerhub.lsst.org/salkafka
+      tag: c0016
       pullPolicy: Always
-
+      nexus3: nexus3-docker
     env:
       lsstDdsDomain: ncsa
       brokerIp: cp-helm-charts-cp-kafka-headless.cp-helm-charts
@@ -333,10 +335,10 @@ Below is an example of doing all the above.
 
   kafka-producers:
     image:
-      repository: lsstts/salkafka
-      tag: v1.1.2_salobj_v5.11.0_xml_v5.1.0
+      repository: ts-dockerhub.lsst.org/salkafka
+      tag: c0016
       pullPolicy: Always
-
+      nexus3: nexus3-docker
     env:
       lsstDdsDomain: ncsa
       brokerIp: cp-helm-charts-cp-kafka-headless.cp-helm-charts
@@ -346,7 +348,6 @@ Below is an example of doing all the above.
       replication: 3
       waitAck: 1
       logLevel: 20
-
     producers:
       comcam: null
       auxtel: null
@@ -356,7 +357,7 @@ Below is an example of doing all the above.
       latiss: null
       test: 
         image:
-          tag: v1.1.3_salobj_v5.12.0_xml_v5.2.0
+          tag: c0016.001
       ccarchiver:
         cscs: >-
           CCArchiver
@@ -379,25 +380,25 @@ CSC Configuration
 There are few different variants of CSC configuration as discussed previously. 
 Most CSC configuration consists of Docker image information and environment variables that must be set as well as the namespace that the CSC should belong to.
 The namespace is handled in the CSC ``values.yaml`` in order to have that applied uniformly across all sites.
-An example of a simple one showing a specific namespace is shown below.
+An example of a simple configuration showing a specific namespace is shown below.
 
 ::
 
   csc:
     namespace: maintel
 
-CSCs may have other values they need to applied regardless of site. Here is an
+CSCs may have other values they need to apply regardless of site. Here is an
 example from the ``mtcamhexapod`` application.
 
 ::
 
   csc:
-    env:
-      RUN_ARG: -s 1
-
     namespace: maintel
+    env:
+      OSPL_INFOFILE: /tmp/ospl-info-mtcamhexapod.log
+      OSPL_ERRORFILE: /tmp/ospl-error-mtcamhexapod.log
+    osplVersion: V6.10.4
 
-The ``RUN_ARG`` configuration sets the index for the underlying component that the container will run.
 Other global environment variables can be specified in this manner.
 
 The Docker image configuration is handled on a site basis to allow independent evolution.
@@ -406,33 +407,30 @@ Below is an example site configuration from the ``mtcamhexapod`` for the NCSA te
 
 ::
 
-  csc: 
-    image:
-      repository: lsstts/hexapod
-      tag: v0.5.2
-      pullPolicy: Always
-
-    env:
-      LSST_DDS_PARTITION_PREFIX: ncsa 
-
-Other site specific environment variables can be listed in the `env` section if they are appropriate to running the CSC container.
-
-Containers that require the use of the Nexus3 repository, currently identified by the use of ``ts-dockerhub.lsst.org`` in the `image.repository` name, need to configure the `image.nexus3` key in order for secret access to occur.
-An example ``values.yaml`` file for the ``mtptg`` is shown below.
-
-::
-
   csc:
     image:
+      repository: ts-dockerhub.lsst.org/mthexapod
+      tag: c0016
+      pullPolicy: Always
       nexus3: nexus3-docker
-
     env:
-      TELESCOPE: MT
+      LSST_DDS_PARTITION_PREFIX: ncsa
+      RUN_ARG: --simulate 1
+    shmemDir: /scratch.local/ospl
 
-    namespace: maintel
+The ``RUN_ARG`` configuration sets the index for the underlying component that the container will run and puts it into simulation mode.
+Other site specific environment variables can be listed in the `env` section if they are appropriate to running the CSC container.
 
+All containers require the use of the Nexus3 repository, identified by the use of ``ts-dockerhub.lsst.org`` in the `image.repository` name.
+The `image.nexus3` key must be configured in order for secret access to occur.
 The value in the `image.nexus3` entry is specific to the Nexus3 instance that is based in Tucson.
 This may be expanded to other replications in the future.
+The site specific configuration for the ``mtcamhexapod`` application given previously shows this information is configured.
+
+.. warning:: The entrypoint configuration is currently broken and needs to be 
+             fixed in the current CSC Helm chart.
+             There has been less use of this feature recently, so this may be retired.
+             The documentation below will not be removed for now.
 
 The CSC container may need to override the command script that the container automatically runs on startup.
 An example of how this is accomplished is shown below.
@@ -441,8 +439,8 @@ An example of how this is accomplished is shown below.
 
   csc: 
     image:
-      repository: lsstts/atdometrajectory
-      tag: v1.2_salobj_v5.4.0_idl_v1.1.2_xml_v4.7.0
+      repository: ts-dockerhub.lsst.org/atdometrajectory
+      tag: c0016
       pullPolicy: Always
 
     env:
@@ -463,8 +461,11 @@ The script for the `entrypoint` must be entered line by line with an empty line 
 The pipe (|) at the end of the `entrypoint` keyword is required to help obtain the proper formatting.
 Using the `entrypoint` key activates the use of the ConfigMap API.
 
+.. note:: End currently broken feature documentation.
+
 If a CSC requires a physical volume to write files out to, the `mountpoint` key should be used.
 This should be a rarely used variant, but it is supported.
+The persistent volume claim is local to the Kubernetes cluster and by default is not persisted if the volume claim disappears. 
 The Header Service will use this when deployed to the summit until the S3 system is available.
 A configuration might look like the following.
 
@@ -472,7 +473,6 @@ A configuration might look like the following.
 
   csc:
     ...
-
     mountpoint:
       - name: www
         path: /home/saluser/www
@@ -485,7 +485,8 @@ Collector Applications
 ~~~~~~~~~~~~~~~~~~~~~~
 
 As noted earlier, these applications are collections of individual CSC apps aligned with a particular subsystem.
-The main configuration is the list of CSC apps to include on launch. Here is how the ``values.yaml`` file for the ``maintel`` app looks.
+The all-site configuration handles ArgoCD information, CSCs that are not simulators and possibly indexed CSCs.
+Here is how the ``values.yaml`` file for the ``maintel`` app looks.
 
 ::
 
@@ -496,20 +497,9 @@ The main configuration is the list of CSC apps to include on launch. Here is how
       repoURL: https://github.com/lsst-ts/argocd-csc
       targetRevision: HEAD
 
-  env: ncsa-teststand
-
-  cscs:
-    - mtaos
-    - mtcamhexapod
-    - mtm1m3
-    - mtm2
-    - mtm2hexapod
-    - mtmount
-    - mtptg
-    - mtrotator
-
   noSim:
     - mtptg
+    - mtdometrajectory
 
 The `spec` section is specific to ArgoCD and should not be changed unless you really understand the consequences. The exceptions to this are the `repoURL` and `targetRevision` parameters.
 It is possible the Github repository moves during the lifetime of the project, so `repoURL` will need to be updated if that happens.
@@ -517,20 +507,62 @@ There might also be a need to testing something that is not on the ``master`` br
 the repository.
 To support that, change the `targetRevision` to the appropriate branch name.
 Use this sparingly, as main configuration tracking is on the ``master`` branch.
-The `env` parameter sets the ``value-<env>.yaml`` for the listed CSC apps.
-This will change on a per site basis. The `cscs` parameter is the listing of the CSC apps that the collector app will control.
-This can also be changed on a per site basis.
 
-As an example of per site configuration, below is an example for the summit configuration of the ``maintel`` app.
+The site specific configurations handle setting up the list of CSCs to run and the environment for that site.
+It can also handle the need for running simulators on the summit.
+Below is the configuration for ``maintel`` from the ``values-summit.yaml`` configuration.
 
 ::
 
   env: summit
-
   cscs:
     - mtaos
     - mtptg
+    - mtmount
+    - mtdome
+    - mtdometrajectory
+    - ccheaderservice
+  runAsSim:
+    - mtaos
+    - mtdome
+    - mtmount
 
-As you can see, the `env` parameter is overridden to the correct name and the list of CSCs is much shorter.
-This is due to the presence of real hardware on the summit.
-The ``auxtel`` collector app follows similar configuration mechanisms but controls a different list of CSC apps as does the ``obssys`` collector app.
+The `env` parameter sets the ``value-<env>.yaml`` for the listed CSC apps.
+This will change on a per site basis. The `cscs` parameter is the listing of the CSC apps that the collector app will control.
+
+The ``auxtel`` collector app follows similar configuration mechanisms but controls a different list of CSC apps as does the ``obssys`` and ``eas`` collector apps.
+
+The ``eas`` collector app has one other variation since it handles indexed CSCs all coming from the same application.
+Below is a section from the ``values.yaml`` file showing how indexed components are treated.
+
+::
+
+  ...
+  indexed:
+    dimm: 4
+    weatherstation: 14
+    dsm: 3
+
+The key points to the application directory that will be used and the number represents the length of the key.
+This is necessary since there are no tools in the Helm system that allow the length determination of a string.
+To use the indexed components, here is the ``values-summit.yaml`` configuration for the ``eas`` app.
+
+::
+
+  env: summit
+  cscs:
+    - dimm1
+    - dimm2
+
+Using the length provided in the ``values.yaml`` file, the number at the end of the name is retrieved.
+This is used to set the appropriate configuration file in the application directory for the specific index.
+The index configuration files look like ``values-<app name><#>.yaml`` and contain index specific setup.
+The index=1 DIMM component configuration ``values-dimm1.yaml`` is shown below.
+
+::
+
+  csc:
+    env:
+      RUN_ARG: 1
+
+The index specific configuration required will vary with the different CSCs.

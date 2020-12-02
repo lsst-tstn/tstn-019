@@ -88,7 +88,7 @@ OSPL Daemon Chart
 -----------------
 
 This chart (`ospl-daemon`) handles deploying the OSPL daemon service for the shared memory configuration.
-This daemon takes over the communcation startup, handling and teardown from the individual CSC applications.
+This daemon takes over the communication startup, handling and tear down from the individual CSC applications.
 The chart uses a DaemonSet from the Kubernetes Workload APIs since it is designed to run on every node of a Kubernetes cluster.
 
 .. list-table:: OSPL Daemon Chart YAML Configuration
@@ -113,8 +113,8 @@ The chart uses a DaemonSet from the Kubernetes Workload APIs since it is designe
    * - env
      - This section holds a set of key, value pairs for environmental variables
    * - osplVersion
-     - This is the version of the commercial OpenSplice library to run. It is
-       used to set the location of the OSPL configuration file
+     - This is the version of the OpenSplice library to run. It is used to set the 
+       location of the OSPL configuration file
    * - shmemDir
      - This is the path to the Kubernetes local store where the shared memory
        database will be written
@@ -204,8 +204,8 @@ For each producer specified in the configuration, a deployment will be created. 
    * - namespace
      - This is the namespace in which the producers will be placed
    * - osplVersion
-     - This is the version of the commercial OpenSplice library to run. It is
-       used to set the location of the OSPL configuration file
+     - This is the version of the OpenSplice library to run. It is used to set the 
+       location of the OSPL configuration file
    * - shmemDir
      - This is the path to the Kubernetes local store where the shared memory
        database will be written
@@ -243,7 +243,7 @@ volumeMount
   A CSC that requires access to a physical disk store in order to transfer information into the running container
 
 The chart consists of the Job Kubernetes Workflows API, ConfigMap and PersistentVolumeClaim Kubernetes Config and Storage APIs.
-The Job API is used to provide correct behavior when a CSC is sent of OFFLINE mode, the pod should not restart.
+The Job API is used to provide correct behavior when a CSC is sent to OFFLINE mode, the pod should not restart.
 If the CSC dies for an unknown reason, not one caught by a FAULT state transition, a new pod will be started and the CSC will then come up in its lowest control state.
 The old pod will remain in a failed state, but available for interrogation about the problem.
 The other APIs are used to support the non-simple CSC variants.
@@ -290,8 +290,8 @@ They will be mentioned in the configuration description which we will turn to ne
    * - mountpoint.claimSize
      - The requested physical disk space size for the volume mount
    * - osplVersion
-     - This is the version of the commercial OpenSplice library to run. It is
-       used to set the location of the OSPL configuration file
+     - This is the version of the OpenSplice library to run. It is used to set the
+       location of the OSPL configuration file
    * - shmemDir
      - This is the path to the Kubernetes local store where the shared memory
        database will be written

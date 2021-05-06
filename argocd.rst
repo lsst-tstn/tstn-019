@@ -62,8 +62,9 @@ Examples will be provided below.
 Cluster Configuration
 ---------------------
 
-This application (``cluster-config``) contains a VaultSecret `Vault <https://www.vaultproject.io/>`_ API in the ``templates`` directory that handles setting up the access credential secrets for image pulling into each defined namespace.
-This requires a configuration parameter that is outside the chart level configuration. 
+This application (``cluster-config``) contains a VaultSecret `Vault <https://www.vaultproject.io/>`_ API in the ``templates`` directory (``vault-secret.yaml``) that handles setting up the access credential secrets for image pulling into each defined namespace.
+There is another Vault API in the ``templates`` directory (``namespace-secrets.yaml``) that can setup extra secrets for applications to use.
+These templates require configuration parameters that are outside the chart level configuration. 
 
 .. list-table:: Cluster Configuration Extra YAML Configuration
    :widths: 10 20
@@ -73,6 +74,13 @@ This requires a configuration parameter that is outside the chart level configur
      - Description
    * - deployEnv
      - The site tag to use when setting up the namespace secrets
+   * - extraSecrets
+     - This section can specify a list of secrets to setup for different namespaces
+   * - extraSecrets[].name
+     - The key name in the vault store. The full name is constructed using the namespace
+       configuration parameter as well
+   * - extraSecrets[].namespaces
+     - The list of namespaces to add the secret specification into
 
 Collector Apps
 --------------
@@ -90,6 +98,10 @@ values.yaml
 templates/<collector app name>.yaml
   This file contains the ArgoCD Application API used to deploy the associated CSCs specified by the collector app configuration.
   One application is generated for each CSC listed in the configuration.
+
+The following specifies all of the parameters that are available across the different collector apps.
+However, not all collector apps support all of these parameters.
+Consult the collector app specific ``templates/<collector app name>.yaml`` file.
 
 .. list-table:: Collector Application YAML Configuration
    :widths: 10 20
@@ -197,6 +209,7 @@ The ``values-ncsa-teststand.yaml`` is shown as an example.
   deployEnv: ncsa-teststand
 
 If you want to override the list of namespaces for a particular site, this is how it would be done for a site specific file.
+Also included in the example is how one would specify extra namespace secrets.
 
 ::
 
@@ -207,6 +220,16 @@ If you want to override the list of namespaces for a particular site, this is ho
       - home
 
   deployEnv: tucson-teststand
+
+  extraSecrets:
+    - name: key1
+      namespaces:
+        - test1
+        - home
+    - name: key2
+      namespaces:
+        - myspace
+        - home
 
 OSPL Configuration
 ~~~~~~~~~~~~~~~~~~
@@ -242,21 +265,18 @@ The all-site configuration in ``values.yaml`` looks like this.
     durabilityServiceTracingVerbosity: FINER
     durabilityServiceTracingLogfile: stdout
  
-The list of namespaces *MUST* contain at least the same namespaces as
-``cluster-config``.
+The list of namespaces *MUST* contain at least the same namespaces as ``cluster-config``.
 The `networkInterface` is the name specified by the ``multus`` CNI and is the same for all sites that we currently deploy to.
 The rest of the configuration is meant for handling setup, services and features
 related to the shared memory configuration.
-If you want to adjust configuration parameters for testing without effecting
-other sites, a site specific configuration file can be used.
+If you want to adjust configuration parameters for testing without effecting other sites, a site specific configuration file can be used.
 
 OSPL Daemon Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The OSPL daemon configuration has a global ``values.yaml`` file that sets the
-namespace, OSPL log files and OSPL version for all sites.
+The OSPL daemon configuration has a global ``values.yaml`` file that sets the namespace, OSPL log files and OSPL version for all sites.
 All other configuration should be handled in a site YAML configuration file.
-The configuration from the ``values-summit.yaml`` configuration file is shown below.
+The an example configuration for the summit is shown below.
 
 ::
 
@@ -269,6 +289,11 @@ The configuration from the ``values-summit.yaml`` configuration file is shown be
     env:
       LSST_DDS_PARTITION_PREFIX: summit
     shmemDir: /run/ospl
+    osplVersion: V6.10.5
+    initContainer:
+      repository: lsstit/ddsnet4u
+      tag: latest
+      pullPolicy: Always
 
 Kafka Producer Configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -300,8 +325,7 @@ A snippet of the configuration is shown below.
           MTPtg
       ...
 
-Each key under `producers` is the name for that given producer along with the
-list of CSCs that producer will monitor. 
+Each key under `producers` is the name for that given producer along with the list of CSCs that producer will monitor. 
 
 The Docker image and other producer configuration is handled on a site basis.
 Here is an example from the ``values-ncsa-teststand.yaml``. 
@@ -348,6 +372,8 @@ Below is an example of doing all the above.
       replication: 3
       waitAck: 1
       logLevel: 20
+      extras:
+        LSST_DDS_RESPONSIVENESS_TIMEOUT: 15s
     producers:
       comcam: null
       auxtel: null
@@ -369,15 +395,13 @@ Below is an example of doing all the above.
           CCHeaderService
 
 The `null` is how to remove producers from the ``values.yaml`` configuration. 
-The ``eas`` producer changes the list of CSCs from DIMM, DSM, Environment to
-DSM.
+The ``eas`` producer changes the list of CSCs from DIMM, DSM, Environment to DSM.
 The ``test`` producer changes the site configured image tag to something different.
 The ``ccarchiver``, ``cccamera`` and ``ccheaderservice`` producers are new ones specified for this site only.
 
 CSC Configuration
 ~~~~~~~~~~~~~~~~~
-
-There are few different variants of CSC configuration as discussed previously. 
+ 
 Most CSC configuration consists of Docker image information and environment variables that must be set as well as the namespace that the CSC should belong to.
 The namespace is handled in the CSC ``values.yaml`` in order to have that applied uniformly across all sites.
 An example of a simple configuration showing a specific namespace is shown below.
@@ -387,8 +411,7 @@ An example of a simple configuration showing a specific namespace is shown below
   csc:
     namespace: maintel
 
-CSCs may have other values they need to apply regardless of site. Here is an
-example from the ``mtcamhexapod`` application.
+CSCs may have other values they need to apply regardless of site. Here is an example from the ``mtcamhexapod`` application.
 
 ::
 
@@ -400,6 +423,7 @@ example from the ``mtcamhexapod`` application.
     osplVersion: V6.10.4
 
 Other global environment variables can be specified in this manner.
+Note that variables specified in the ``values.yaml`` can still be overridden by site-specific files.
 
 The Docker image configuration is handled on a site basis to allow independent evolution.
 This also applies to the ``LSST_DDS_PARTITION_PREFIX`` environment variable since those are definitely site specific.
@@ -427,11 +451,6 @@ The value in the `image.nexus3` entry is specific to the Nexus3 instance that is
 This may be expanded to other replications in the future.
 The site specific configuration for the ``mtcamhexapod`` application given previously shows this information is configured.
 
-.. warning:: The entrypoint configuration is currently broken and needs to be 
-             fixed in the current CSC Helm chart.
-             There has been less use of this feature recently, so this may be retired.
-             The documentation below will not be removed for now.
-
 The CSC container may need to override the command script that the container automatically runs on startup.
 An example of how this is accomplished is shown below.
 
@@ -442,10 +461,8 @@ An example of how this is accomplished is shown below.
       repository: ts-dockerhub.lsst.org/atdometrajectory
       tag: c0016
       pullPolicy: Always
-
     env:
       LSST_DDS_PARTITION_PREFIX: lsatmcs
-
     entrypoint: |
       #!/usr/bin/env bash
 
@@ -461,11 +478,9 @@ The script for the `entrypoint` must be entered line by line with an empty line 
 The pipe (|) at the end of the `entrypoint` keyword is required to help obtain the proper formatting.
 Using the `entrypoint` key activates the use of the ConfigMap API.
 
-.. note:: End currently broken feature documentation.
-
-If a CSC requires a physical volume to write files out to, the `mountpoint` key should be used.
+If a CSC requires a physical volume to read and/or write files out to, the `pvcMountpoint` and `nfsMountpoint` keys should be used.
 This should be a rarely used variant, but it is supported.
-The persistent volume claim is local to the Kubernetes cluster and by default is not persisted if the volume claim disappears. 
+The persistent volume claim created by using `pvcMountpoint` is local to the Kubernetes cluster and by default is not persisted if the volume claim disappears. 
 The Header Service will use this when deployed to the summit until the S3 system is available.
 A configuration might look like the following.
 
@@ -473,13 +488,28 @@ A configuration might look like the following.
 
   csc:
     ...
-    mountpoint:
-      - name: www
-        path: /home/saluser/www
-        accessMode: ReadWriteOnce
-        claimSize: 50Gi
+    pvcMountpoint:
+    - name: www
+      path: /home/saluser/www
+      accessMode: ReadWriteOnce
+      claimSize: 50Gi
 
 The description of the `claimSize` units can be found at this `page <https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory>`_.
+
+The `nfsMountpoint` key can be used to attach to a NFS export. 
+The ``mtaos`` leverages this mechanism for reading Bulter ingested files.
+An example configuration taken from the ``mtaos`` summit configuration, looks like this.
+
+::
+
+  csc:
+    ...
+    nfsMountpoint:
+    - name: comcam-data
+      containerPath: /readonly/lsstdata/comcam
+      readOnly: true
+      server: comcam-arctl01.cp.lsst.org
+      serverPath: /lsstdata 
 
 Collector Applications
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -502,7 +532,7 @@ Here is how the ``values.yaml`` file for the ``maintel`` app looks.
     - mtdometrajectory
 
 The `spec` section is specific to ArgoCD and should not be changed unless you really understand the consequences. The exceptions to this are the `repoURL` and `targetRevision` parameters.
-It is possible the Github repository moves during the lifetime of the project, so `repoURL` will need to be updated if that happens.
+It is possible the GitHub repository moves during the lifetime of the project, so `repoURL` will need to be updated if that happens.
 There might also be a need to testing something that is not on the ``master`` branch of
 the repository.
 To support that, change the `targetRevision` to the appropriate branch name.

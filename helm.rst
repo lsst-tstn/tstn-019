@@ -1,15 +1,16 @@
 Helm Charts
 ===========
 
-The CSC deployment starts with a `Helm <https://v2.helm.sh/>`_ chart.
-We are currently adopting version 1.4 of ArgoCD which works with Helm version 2.
-The code for the charts are kept in the `Helm chart Github repository <https://github.com/lsst-ts/charts>`_.
+The CSC deployment starts with a `Helm <https://helm.sh/>`_ chart.
+We are currently adopting version 1.8+ of ArgoCD which works with Helm version 3.
+The code for the charts are kept in the `Helm chart GitHub repository <https://github.com/lsst-ts/charts>`_.
 The next two sections will discuss each chart in detail.
 For a description of the APIs used, consult the `Kubernetes documentation <https://kubernetes.io/docs/reference/>`_ reference.
 The chart sections will not go into great detail on the content of each API delivered.
 Each chart section will list all of the possible configuration aspects that each chart is delivering, but full use of that configuration is left to the `ArgoCD Configuration` section and examples will be provided there.
 For the CSC deployment, we will run a single container per pod on Kubernetes.
 The Kafka producers will follow the same pattern.
+The OSPL daemon instances will use a init container on the summit to handle routing aspects for the DDS communication.
 
 Cluster Configuration Chart
 ---------------------------
@@ -58,6 +59,10 @@ The chart uses ConfigMap from the Kubernetes Config and Storage API to provide t
      - The stack size in bytes for the daemon service
    * - waterMarksWhcHigh
      - This sets the size of the high watermark. Units must be explicitly used
+   * - waterMarksWhcHighInit
+     - This sets the the initial size of the high watermark. Units must be explicitly used
+   * - waterMarksWhcAdaptive
+     - This makes the high watermark change according to system pressure
    * - deliveryQueueMaxSamples
      - This controls the maximum size of the delivery queue in samples
    * - dsGracePeriod
@@ -82,6 +87,14 @@ The chart uses ConfigMap from the Kubernetes Config and Storage API to provide t
      - This sets the level of information for the Durability tracing
    * - durabilityServiceTracingLogfile
      - This specifies the location and name of the Durability tracing log
+   * - durabilityServiceInitialDiscoveryPeriod
+     - This sets the time for the initial discovery period during startup. Time in seconds
+   * - durabilityServiceAlignmentComboPeriodInitial
+     - This sets the maximum amount of time (seconds) a system waits for alignment after
+       an alignment request while the system is not operational
+   * - durabilityServiceAlignmentComboPeriodOperational
+     - This sets the maximum amount of time (seconds) a system waits for alignment after
+       an alignment request while the system is operational
 
 
 OSPL Daemon Chart
@@ -100,9 +113,9 @@ The chart uses a DaemonSet from the Kubernetes Workload APIs since it is designe
    * - image
      - This section holds the configuration of the container image
    * - image.repository
-     - The Docker registry name of the container image to use for the producers
+     - The Docker registry name of the container image
    * - image.tag
-     - The tag of the container image to use for the producers
+     - The tag of the container image
    * - image.pullPolicy
      - The policy to apply when pulling an image for deployment
    * - image.nexus3
@@ -112,9 +125,20 @@ The chart uses a DaemonSet from the Kubernetes Workload APIs since it is designe
      - This is the namespace in which the CSC will be placed
    * - env
      - This section holds a set of key, value pairs for environmental variables
+   * - useExternalConfig
+     - This sets whether to rely on the ConfigMap for OSPL configuration or the internal
+       OSPL configuration
    * - osplVersion
      - This is the version of the OpenSplice library to run. It is used to set the 
        location of the OSPL configuration file
+   * - initContainer
+     - This section sets the option use of an init container for DDS route fixing
+   * - initContainer.repository
+     - The Docker registry name of the init container image
+   * - initContainer.tag
+     - The tag of the init container image 
+   * - initContainer.pullPolicy
+     - The policy to apply when pulling an image for init container deployment
    * - shmemDir
      - This is the path to the Kubernetes local store where the shared memory
        database will be written
@@ -123,6 +147,15 @@ The chart uses a DaemonSet from the Kubernetes Workload APIs since it is designe
        Defaults to true
    * - useHostPid
      - This sets the use of the host process ID system. Defaults to true
+   * - resources
+     - This allows the specifications of resources (CPU, memory) requires to run the
+       container
+   * - nodeSelector
+     - This allows the specification of using specific nodes to run the pod
+   * - affinity
+     - This specifies the scheduling constraints of the pod
+   * - tolerations
+     - This specifies the tolerations of the pod for any system taints
 
 Kafka Producer Chart
 --------------------
@@ -203,9 +236,23 @@ For each producer specified in the configuration, a deployment will be created. 
        for the named producer
    * - namespace
      - This is the namespace in which the producers will be placed
+   * - useMulticast
+     - This sets the use of the annotation the `multus` address binding needed for DDS
+       communication
+   * - useExternalConfig
+     - This sets whether to rely on the ConfigMap for OSPL configuration or the internal
+       OSPL configuration
    * - osplVersion
      - This is the version of the OpenSplice library to run. It is used to set the 
        location of the OSPL configuration file
+   * - initContainer
+     - This section sets the option use of an init container for DDS route fixing
+   * - initContainer.repository
+     - The Docker registry name of the init container image
+   * - initContainer.tag
+     - The tag of the init container image 
+   * - initContainer.pullPolicy
+     - The policy to apply when pulling an image for init container deployment
    * - shmemDir
      - This is the path to the Kubernetes local store where the shared memory
        database will be written
@@ -214,6 +261,15 @@ For each producer specified in the configuration, a deployment will be created. 
        Defaults to true
    * - useHostPid
      - This sets the use of the host process ID system. Defaults to true
+   * - resources
+     - This allows the specifications of resources (CPU, memory) requires to run the
+       container
+   * - nodeSelector
+     - This allows the specification of using specific nodes to run the pod
+   * - affinity
+     - This specifies the scheduling constraints of the pod
+   * - tolerations
+     - This specifies the tolerations of the pod for any system taints
 
 .. [#] A given producer is given a name key that is used to identify that producer (e.g. auxtel).
 .. [#] The characters >- are used after the key so that the CSCs can be specified in a list
@@ -227,27 +283,16 @@ For each producer specified in the configuration, a deployment will be created. 
 CSC Chart
 ---------
 
-Instead of having charts for every CSC, we employ an approach of having one chart that describes all the different CSC variants.
-There are four main variants that the chart supports:
-
-simple
-  A CSC that requires no special interventions and uses only environment variables for configuration
-
-entrypoint
-  A CSC that uses an override script for the container entrypoint.
-
-imagePullSecrets
-  A CSC that requires the use of the Nexus3 repository and need access credentials for pulling the associated image
-
-volumeMount
-  A CSC that requires access to a physical disk store in order to transfer information into the running container
+Instead of having charts for every CSC, we employ an approach of having one chart that handles all of the variations.
+The chart supports image pull secrets, volume mounts (ones requiring a storage allocation and ones pointing to a NFS server), overriding the standard container entrypoint, secret injection and a number of configurations specific to the OpenSplice/DDS system.
 
 The chart consists of the Job Kubernetes Workflows API, ConfigMap and PersistentVolumeClaim Kubernetes Config and Storage APIs.
 The Job API is used to provide correct behavior when a CSC is sent to OFFLINE mode, the pod should not restart.
 If the CSC dies for an unknown reason, not one caught by a FAULT state transition, a new pod will be started and the CSC will then come up in its lowest control state.
 The old pod will remain in a failed state, but available for interrogation about the problem.
-The other APIs are used to support the non-simple CSC variants.
-They will be mentioned in the configuration description which we will turn to next.
+The ConfigMap API is used for specifying the override of the container entrypoint.
+The PersistentVolumeClaim API is used for supporting volume mounts that require a storage allocation request.
+Next, we will turn to the chart configuration descriptions.
 
 .. list-table:: CSC Chart YAML Configuration
    :widths: 15 25
@@ -268,30 +313,65 @@ They will be mentioned in the configuration description which we will turn to ne
        need to be pulled
    * - namespace
      - This is the namespace in which the CSC will be placed
+   * - useMulticast
+     - This sets the use of the annotation the `multus` address binding needed for DDS
+       communication
    * - env
      - This section holds a set of key, value pairs for environmental variables
+   * - envSecrets
+     - This section holds specifications for secret injection
+   * - envSecrets.name
+     - The label for the secret
+   * - envSecrets.secretName
+     - The name of the vault store reference. Uses the namespace attribute to construct
+       the full name
+   * - envSecrets.secretKey
+     - The key in the vault store containing the necessary secret
    * - entrypoint
      - This key allows specification of a script to override the entrypoint
-   * - mountpoint
+   * - pvcMountpoint
      - This section holds the information necessary to create a volume mount
        for the container.
-   * - mountpoint.name
+   * - pvcMountpoint.name
      - A label identifier for the mountpoint
-   * - mountpoint.path
+   * - pvcMountpoint.path
      - The path inside the container to mount
-   * - mountpoint.accessMode [#]_
+   * - pvcMountpoint.accessMode [#]_
      - This sets the required access mode for the volume mount.
-   * - mountpoint.ids
+   * - pvcMountpoint.ids
      - This section contains UID and GID overrides
-   * - mountpoint.ids.uid
+   * - pvcMountpoint.ids.uid
      - An alternative UID for mounting
-   * - mountpoint.ids.gid
+   * - pvcMountpoint.ids.gid
      - An alternative GID for mounting
-   * - mountpoint.claimSize
+   * - pvcMountpoint.claimSize
      - The requested physical disk space size for the volume mount
+   * - nfsMountpoint
+     - This section holds the information necessary to create a NFS mount for the container
+   * - nfsMountpoint.name
+     - A label identified for the mountpoint
+   * - nfsMountpoint.containerPath
+     - The path for the container mountpoint
+   * - nfsMountpoint.readOnly
+     - This sets if the NFS mount is read only or read/write
+   * - nfsMountpoint.server
+     - The hostname of the NFS server
+   * - nfsMountpoint.serverPath
+     - The path exported by the NFS server
+   * - useExternalConfig
+     - This sets whether to rely on the ConfigMap for OSPL configuration or the internal
+       OSPL configuration
    * - osplVersion
      - This is the version of the OpenSplice library to run. It is used to set the
        location of the OSPL configuration file
+   * - initContainer
+     - This section sets the option use of an init container for DDS route fixing
+   * - initContainer.repository
+     - The Docker registry name of the init container image
+   * - initContainer.tag
+     - The tag of the init container image 
+   * - initContainer.pullPolicy
+     - The policy to apply when pulling an image for init container deployment
    * - shmemDir
      - This is the path to the Kubernetes local store where the shared memory
        database will be written
@@ -300,6 +380,15 @@ They will be mentioned in the configuration description which we will turn to ne
        Defaults to true
    * - useHostPid
      - This sets the use of the host process ID system. Defaults to true
+   * - resources
+     - This allows the specifications of resources (CPU, memory) requires to run the
+       container
+   * - nodeSelector
+     - This allows the specification of using specific nodes to run the pod
+   * - affinity
+     - This specifies the scheduling constraints of the pod
+   * - tolerations
+     - This specifies the tolerations of the pod for any system taints
 
 .. [#] Definitions can be found `here <https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes>`_.
 
@@ -309,13 +398,5 @@ They will be mentioned in the configuration description which we will turn to ne
 Packaging and Deploying Charts
 ------------------------------
 
-The Github repository has a README that contains information in how to package up a new chart for deployment to the `chart repository <https://lsst-ts.github.io/charts/>`_.
-First, ensure that the chart version has been updated in the `Chart.yaml` file.
-The step for creating/updating the index file needs one more flag for completeness.
-
-::
-
-  helm repo index --url=https://lsst-ts.github.io/charts .
-
-Once the version number is updated, the chart packaged and the index file updated, they can be collected into a single commit and pushed to master.
-That push to master will trigger the installation of the new chart into the chart repository. 
+The GitHub repository is configured to automatically package and publish charts to the `chart repository <https://lsst-ts.github.io/charts/>`_ using the GitHub `chart releaser <https://github.com/helm/chart-releaser>`_ action.
+The publish happens only on branch merges to master.
